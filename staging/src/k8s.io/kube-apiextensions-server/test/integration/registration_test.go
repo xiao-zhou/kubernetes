@@ -480,6 +480,50 @@ func getFromEtcd(keys clientv3.KV, prefix, localPath string) (*metaObject, error
 	return obj, nil
 }
 
+func TestMultipleCRDSameGroup(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+
+	noxuDefinition2 := &apiextensionsv1alpha1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus2.mygroup.example.com"},
+		Spec: apiextensionsv1alpha1.CustomResourceDefinitionSpec{
+			Group:   "mygroup.example.com",
+			Version: "v1alpha1",
+			Names: apiextensionsv1alpha1.CustomResourceDefinitionNames{
+				Plural:     "noxus2",
+				Singular:   "nonenglishnoxu2",
+				Kind:       "WishIHadChosenNoxu2",
+				ShortNames: []string{"foo2", "bar2", "abc2", "def2"},
+				ListKind:   "NoxuItemList",
+			},
+			Scope: apiextensionsv1alpha1.NamespaceScoped,
+		},
+	}
+
+	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition2, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient); err == nil || !errors.IsNotFound(err) {
+		t.Fatalf("expected a NotFound error, got:%v", err)
+	}
+
+	if _, err := testserver.GetCustomResourceDefinition(noxuDefinition2, apiExtensionClient); err == nil || !errors.IsNotFound(err) {
+		t.Fatalf("expected a NotFound error, got:%v", err)
+	}
+}
+
 type metaObject struct {
 	Kind       string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
